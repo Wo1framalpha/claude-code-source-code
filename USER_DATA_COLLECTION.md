@@ -43,3 +43,13 @@ This repo contains the decompiled source for the Claude Code CLI bundle. The not
 | 错误与反馈 | 错误上报和反馈命令被短路 | `src/utils/log.ts`、`src/commands/feedback/index.ts` |
 | 非必要网络调用 | 跳过官方 MCP registry 预取、bootstrap 配置、metrics opt-out、Grove/Referral 预取、以及其他 `isEssentialTrafficOnly()` 守卫的便利请求（如模型能力、发布说明、自动更新等） | `src/services/mcp/officialRegistry.ts`、`src/services/api/bootstrap.ts`、`src/services/api/metricsOptOut.ts`、`src/services/api/grove.ts`、`src/services/api/referral.ts` 等 |
 | 仅保留必要流量 | 模型推理等核心调用仍可进行；其他非必要流量被抑制 | 行为由各调用处的 `isEssentialTrafficOnly()` 分支决定 |
+
+## 语言与时区：在开启 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 时的暴露情况
+
+| 项目 | 是否被采集/发送 | 说明与代码位置 |
+| --- | --- | --- |
+| 系统时区 | **否**：仅用于本地时间格式化显示，不写入遥测或网络请求 | `Intl.DateTimeFormat().resolvedOptions().timeZone` 只在 `src/utils/intl.ts` / `src/utils/format.ts` 的本地格式化中使用 |
+| 系统语言 (locale 语言子标签) | 仅在语音功能的遥测事件中读取；遥测在 `essential-traffic` 下被禁用，因此不会发送 | `getSystemLocaleLanguage()` 仅用于 `useVoice` 的 `logEvent('tengu_voice_recording_started', …)` (`src/hooks/useVoice.ts`)；该事件受 `isTelemetryDisabled()` → `isEssentialTrafficOnly()` 禁用 |
+| 语音 STT 语言参数 | 发送到语音 WebSocket，仅取自用户设置或默认 `en`，不自动读取系统语言 | `connectVoiceStream` 语言参数来自 `normalizeLanguageForSTT(getInitialSettings().language)` (`src/hooks/useVoice.ts` → `src/services/voiceStreamSTT.ts`)；与系统语言/时区无关 |
+
+结论：启用 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 后，遥测/分析被关闭；Claude 不会收到设备的时区或系统语言。语音 STT 仅发送用户设置或默认语言代码，不会上传系统 locale/时区。
